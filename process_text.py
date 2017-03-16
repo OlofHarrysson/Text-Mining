@@ -4,9 +4,11 @@ from nltk.stem import WordNetLemmatizer
 from nltk.sentiment.util import *
 from nltk.sentiment import SentimentIntensityAnalyzer
 from nltk.corpus import words
-
-
-
+from string import punctuation
+from nltk.corpus import stopwords
+from nltk.corpus import brown
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 
 def top_tokens(word_tokens):
@@ -22,8 +24,6 @@ def top_tokens(word_tokens):
 def top_stems(stems):
     print("Stems count ------------------------------------------------------")
     stem_values = list(stems.values())
-    print(stem_values)
-    print(stems)
     stems_count = sorted(((stem_values.count(e), e) for e in set(stem_values)), reverse=True)
 
     print_nbr = 5
@@ -35,8 +35,6 @@ def top_stems(stems):
 def top_lemmas(lemmas):
     print("Lemmas count ------------------------------------------------------")
     lemma_values = list(lemmas.values())
-    print(lemma_values)
-    print(lemmas)
     lemma_count = sorted(((lemma_values.count(e), e) for e in set(lemma_values)), reverse=True)
 
     print_nbr = 5
@@ -46,7 +44,6 @@ def top_lemmas(lemmas):
 
 
 def top_nouns_verbs(tagged):
-    print(tagged)
     nouns = []
     verbs = []
     for tagged_sent in tagged:
@@ -67,17 +64,65 @@ def top_nouns_verbs(tagged):
     print("Verbs count ------------------------------------------------------")
     verbs_count = sorted(((verbs.count(e), e) for e in set(verbs)), reverse=True)
 
-    print_nbr = 5
     verbs_count = verbs_count[:print_nbr]
     for verb in verbs_count:
         print(verb)
 
-def top_entities(text):
+
+def top_entities(ne_chunked):
+    print("Top Entities ------------------------------------------------------")
+
+    data = {}
+    for entity in ne_chunked:
+        if isinstance(entity, nltk.tree.Tree):
+            text = " ".join([word for word, tag in entity.leaves()])
+            ent = entity.label()
+            data[text] = ent
+        else:
+            continue
+    print(data)
+
+
+def top_sentiment_sentence(polarity_scores):
+    sorted_negative = sorted(score.get('compound') for score in polarity_scores)
+    sorted_positive = sorted((score.get('compound') for score in polarity_scores), reverse=True)
+
+    print_nbr = 5
+    print("Most negative sentences ------------------------------------------------------")
+    for score in sorted_negative:
+        print(score)
+
+    print("Most positive sentences ------------------------------------------------------")
+    for score in sorted_positive:
+        print(score)
+
+    print("Sum of sentiment is ------------------------------------------------------")
+    sent_sum = sum(sorted_positive)
+    print(sent_sum)
+
+
+def identify_weird_words(tokens): # Currently to slow. Approx 3 sec to check one word
+    # weird_words = []
+    # brown_words = brown.words()
+
+    # for word in tokens:
+    #     if word not in brown_words:
+    #         weird_words.append(word)
+    #         break;
+
+
+    # print("Weird words are ------------------------------------------------------")
+    # print(weird_words)
     pass
 
-def top_sentiment(text):
-    pass
 
+def disp_text(text):
+    wordcloud = WordCloud().generate(text)
+
+    plt.figure()
+    plt.imshow(wordcloud)
+    plt.axis("off")
+    plt.show()
 
 
 # ------------------------------ START -----------------------------------
@@ -86,45 +131,45 @@ with open('sentences.txt', 'r') as f:
     text = f.read()
 
 sentences = nltk.sent_tokenize(text)
-print("Sentences are ------------------------------------------------------")
-print(sentences)
 
+# Splits into words
 sent_tokens = [nltk.word_tokenize(sent) for sent in sentences]
 word_tokens = nltk.word_tokenize(text)
 
-print("Sentence tokens are ------------------------------------------------------")
-print(sent_tokens)
+# Removes punctuation and stop words such as "and, the, is..."
+stops = stopwords.words('english')
+temp = []
+for sent_t in sent_tokens:
+    no_punct = [token for token in sent_t if token not in punctuation]
+    temp.append([token for token in no_punct if token not in stops])
+
+sent_tokens = temp
+word_tokens = [token for token in word_tokens if token not in punctuation]
+word_tokens = [token for token in word_tokens if token not in stops]
 
 # Stems are basic versions of words
-# stemmer = PorterStemmer()
-# stems = {token:stemmer.stem(token) for token in word_tokens}
-# print("Stems are ------------------------------------------------------")
-# print(stems)
+stemmer = PorterStemmer()
+stems = {token:stemmer.stem(token) for token in word_tokens}
 
 # Lemmas look at the meaning of the word
-# lemmatizer = WordNetLemmatizer()
-# lemmas = {token:lemmatizer.lemmatize(token) for token in word_tokens}
-# print("Lemmas are ------------------------------------------------------")
-# print(lemmas)
+lemmatizer = WordNetLemmatizer()
+lemmas = {token:lemmatizer.lemmatize(token) for token in word_tokens}
 
-tagged = [nltk.pos_tag(sent) for sent in sent_tokens]
-# print("Tagged are ------------------------------------------------------")
-# print(tagged)
+tagged_sent = [nltk.pos_tag(sent) for sent in sent_tokens]
 
-# tagged = nltk.pos_tag(word_tokens)
-# ne_chunked = nltk.ne_chunk(tagged, binary=True)
-# print("ne_chunked are ------------------------------------------------------")
-# print(ne_chunked)
+tagged_words = nltk.pos_tag(word_tokens)
+ne_chunked = nltk.ne_chunk(tagged_words, binary=True)
 
-# vader_analyzer = SentimentIntensityAnalyzer()
-# print("vader_analyzer are ------------------------------------------------------")
-# print(vader_analyzer.polarity_scores(text))
-
-
-# top_tokens(word_tokens)
-# top_stems(stems)
-# top_lemmas(lemmas)
-top_nouns_verbs(tagged)
+vader_analyzer = SentimentIntensityAnalyzer()
+polarity_scores = [vader_analyzer.polarity_scores(sent) for sent in sentences]
 
 
 
+top_tokens(word_tokens)
+top_stems(stems)
+top_lemmas(lemmas)
+top_nouns_verbs(tagged_sent)
+top_entities(ne_chunked)
+top_sentiment_sentence(polarity_scores)
+identify_weird_words(word_tokens)
+disp_text(text)
